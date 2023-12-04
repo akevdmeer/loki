@@ -226,6 +226,18 @@ func TestNamedStores_populateStoreType(t *testing.T) {
 		_, ok = ns.storeType["store-4"]
 		assert.False(t, ok)
 	})
+
+	t.Run("support s3 (alias for aws) named_stores store type", func(t *testing.T) {
+		ns := NamedStores{
+			S3: map[string]NamedS3StorageConfig{
+				"valid-store-name": {},
+			},
+		}
+
+		err := ns.populateStoreType()
+		require.NoError(t, err)
+		assert.Equal(t, ns.storeType["valid-store-name"], config.StorageTypeS3)
+	})
 }
 
 func TestNewObjectClient_prefixing(t *testing.T) {

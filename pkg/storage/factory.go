@@ -139,6 +139,18 @@ func (cfg *NamedAWSStorageConfig) Validate() error {
 	return (*aws.StorageConfig)(cfg).Validate()
 }
 
+type NamedS3StorageConfig aws.StorageConfig
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (cfg *NamedS3StorageConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	flagext.DefaultValues((*aws.StorageConfig)(cfg))
+	return unmarshal((*aws.StorageConfig)(cfg))
+}
+
+func (cfg *NamedS3StorageConfig) Validate() error {
+	return (*aws.StorageConfig)(cfg).Validate()
+}
+
 type NamedBlobStorageConfig azure.BlobStorageConfig
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -206,6 +218,7 @@ func (cfg *NamedCOSConfig) UnmarshalYAML(unmarshal func(interface{}) error) erro
 // NamedStores helps configure additional object stores from a given storage provider
 type NamedStores struct {
 	AWS          map[string]NamedAWSStorageConfig  `yaml:"aws"`
+	S3           map[string]NamedS3StorageConfig   `yaml:"s3"`
 	Azure        map[string]NamedBlobStorageConfig `yaml:"azure"`
 	BOS          map[string]NamedBOSStorageConfig  `yaml:"bos"`
 	Filesystem   map[string]NamedFSConfig          `yaml:"filesystem"`
@@ -243,7 +256,12 @@ func (ns *NamedStores) populateStoreType() error {
 		}
 		ns.storeType[name] = config.StorageTypeAWS
 	}
-
+	for name := range ns.S3 {
+		if err := checkForDuplicates(name); err != nil {
+			return err
+		}
+		ns.storeType[name] = config.StorageTypeS3
+	}
 	for name := range ns.Azure {
 		if err := checkForDuplicates(name); err != nil {
 			return err
@@ -288,6 +306,12 @@ func (ns *NamedStores) populateStoreType() error {
 }
 
 func (ns *NamedStores) Validate() error {
+	for name, s3Cfg := range ns.S3 {
+		if err := s3Cfg.Validate(); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("invalid S3 Storage config with name %s", name))
+		}
+	}
+
 	for name, awsCfg := range ns.AWS {
 		if err := awsCfg.Validate(); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("invalid AWS Storage config with name %s", name))
